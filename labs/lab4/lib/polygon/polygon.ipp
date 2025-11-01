@@ -44,7 +44,7 @@ Point<T> Polygon<T, N>::Center() const noexcept {
 
 
 template<concepts::Scalar T, std::size_t N>
-void Polygon<T, N>::Swap(Polygon<T, N>& other) noexcept {
+inline void Polygon<T, N>::Swap(Polygon<T, N>& other) noexcept {
     using std::swap;
     swap(points_, other.points_);
 }
@@ -52,5 +52,13 @@ void Polygon<T, N>::Swap(Polygon<T, N>& other) noexcept {
 template<concepts::Scalar T, std::size_t N>
 void swap(Polygon<T, N>& first, Polygon<T, N>& second) noexcept {
     first.Swap(second);
+}
+
+template<concepts::Scalar T, std::size_t N>
+void Polygon<T, N>::Print(std::ostream& out) const {
+    out << typeid(*this).name() << ": ";
+    for(std::size_t i = 0; i < N; ++i) {
+        out << points_[i] << ' ';
+    }
 }
 }
