@@ -4,10 +4,10 @@
 
 namespace concepts {
 
-template<class T>
+template <class T>
 concept Scalar = std::is_arithmetic_v<T>;
 
-template<class T>
+template <class T>
 concept FloatingPoint = std::is_floating_point_v<T>;
 
-}
+}  // namespace concepts

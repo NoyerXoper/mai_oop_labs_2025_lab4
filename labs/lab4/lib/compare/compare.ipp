@@ -4,28 +4,42 @@
 
 namespace compare {
 namespace {
-constexpr double KOEFFITSIENT = 128;
+constexpr double KOEFFITSIENT = 64;
 
-template<concepts::FloatingPoint T>
-struct Eps {
-    constexpr static T EPS = KOEFFITSIENT * std::numeric_limits<T>::epsilon();
-};
+template <concepts::FloatingPoint T>
+constexpr T Eps_v = KOEFFITSIENT* std::numeric_limits<T>::epsilon();
 
-template<concepts::FloatingPoint T>
-using Eps_v = Eps<T>::EPS;
-
-}
-template<concepts::Scalar T>
-constexpr inline bool AreNumbersEqual(T a, T b) {
+}  // namespace
+template <concepts::Scalar T>
+constexpr bool AreNumbersEqual(T a, T b) {
     if constexpr (std::is_floating_point_v<T>) {
-        if (a == b) return true;
+        if (std::isnan(a) || std::isnan(b)) {
+            return false;
+        }
 
+        if (std::isinf(a) || std::isinf(b)) {
+            return false;
+        }
+
+        if (a == b) {
+            return true;
+        }
         T diff = std::abs(a - b);
-        T norm = std::min(std::abs(a + b), std::numeric_limits<T>::max());
 
-        return diff < std::max(norm * Eps_v<T>, std::numeric_limits<T>::epsilon());
+        if (diff < Eps_v<T>) {
+            return true;
+        }
+
+        if (std::max(std::abs(a), std::abs(b)) <
+            std::numeric_limits<T>::min() * 100) {
+            return diff <= Eps_v<T>;
+        }
+
+        T magnitude = std::max(std::abs(a), std::abs(b));
+
+        return diff <= magnitude * Eps_v<T>;
     } else {
         return a == b;
     }
 }
-}
+}  // namespace compare
