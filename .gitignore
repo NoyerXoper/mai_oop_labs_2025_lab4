@@ -2,6 +2,9 @@ build
 .vscode
 .cache
 homeworks
+.clang-format
+format.sh
+homeworks/*
 
 .DS_Store
 # Prerequisites
