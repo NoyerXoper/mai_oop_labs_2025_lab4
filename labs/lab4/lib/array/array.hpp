@@ -16,21 +16,21 @@ struct RawMemoryDeleter {
 // This is bad. Really bad.
 // It's all because of ban of raw ptr.
 // Array (vector) must be on eiter unique_ptr<T[], Deleter> or raw ptr.
-// Shared ptr is bad for vector because: it uses more memory and some other
-// things that we would talk in few next lines. About Data(): it is either UB or
-// it makes vector slow. Return types that Data() can have:
-// std::shared_ptr<T[]>, std::weak_ptr<T[]>, T* weak_ptr<T[]> ~ shared_ptr<T[]>
-// because we can instantly call lock(). shared_ptr<T[]> is bad because the user
-// might think that if he got shared_ptr, then objects won't be destroyed. It
-// can be achieved, but it would significantly reduce performace of the vector
-// or require more heap allocations: it would require storing size in it's
-// deleter size can't be reference in neither vector nor deleter because it can
-// easily become dangling if it's reference in deleter or if it's reference in
-// array, then we can call reset() on Data() and mess things up. So, we can make
-// it shared_ptr. But it would require one more allocation and I don't like it.
-// So, there is T* left. It still can be invalidated, but the user knows about
-// it. So, if we stored data in T*, it would be much easier, more perfomant,
-// more lightweight, more blazing.
+// Shared ptr is bad for vector because: it uses more memory and some other things that we would talk in few next lines.
+// About Data(): it is either UB or it makes vector slow.
+// Return types that Data() can have: std::shared_ptr<T[]>, std::weak_ptr<T[]>,
+// T* weak_ptr<T[]> ~ shared_ptr<T[]> because we can instantly call lock().
+// shared_ptr<T[]> is bad because the user might think that if he got
+// shared_ptr, then objects won't be destroyed. It can be achieved, but it would
+// significantly reduce performace of the vector or require more heap
+// allocations: it would require storing size in it's deleter size can't be
+// reference in neither vector nor deleter because it can easily become dangling
+// if it's reference in deleter or if it's reference in array, then we can call
+// reset() on Data() and mess things up. So, we can make it shared_ptr. But it
+// would require one more allocation and I don't like it. So, there is T* left.
+// It still can be invalidated, but the user knows about it. So, if we stored
+// data in T*, it would be much easier, more perfomant, more lightweight, more
+// blazing.
 template <class T>
 class Array {
 public:
@@ -81,7 +81,8 @@ public:
 
     void Clear() noexcept;
 
-    T* Data() const noexcept;
+    const T* Data() const noexcept;
+    T* Data() noexcept;
 
     std::size_t Size() const noexcept;
     std::size_t Capacity() const noexcept;

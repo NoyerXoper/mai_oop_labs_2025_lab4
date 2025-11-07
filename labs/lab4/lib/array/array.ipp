@@ -38,8 +38,6 @@ Array<T>::Array(std::size_t size) requires std::is_default_constructible_v<T>
     }
 }
 
-// We can't use make_shared because we need to pass deleter object, which is
-// impossible with make_shared
 template <class T>
 Array<T>::Array(std::size_t size,
                 const T& obj) requires std::is_copy_constructible_v<T>
@@ -61,7 +59,8 @@ Array<T>::Array(
                                  RawMemoryDeleter<T>())) {
     std::size_t i = 0;
     for (const T& obj : il) {
-        new (std::addressof(data_[i++])) T(obj);
+        new (std::addressof(data_[i])) T(obj);
+        ++i;
     }
 }
 
@@ -130,7 +129,8 @@ template <class T>
 template <class... Args>
 void Array<T>::EmplaceBack(Args&&... args) {
     CheckCapacity(size_ + 1);
-    new (std::addressof(data_[size_++])) T(std::forward<Args>(args)...);
+    new (std::addressof(data_[size_])) T(std::forward<Args>(args)...);
+    ++size_;
 }
 
 // If it was universal reference, then the requires would have become bloated.
@@ -227,7 +227,7 @@ const T& Array<T>::At(std::size_t i) const {
 
 template <class T>
 void Array<T>::Pop(std::size_t pos) {
-    assert(pos < this->size_);
+    assert(pos < size_);
     for (std::size_t i = pos; i < size_ - 1; ++i) {
         data_[i] = std::move(data_[i + 1]);
     }
@@ -251,7 +251,12 @@ void Array<T>::Clear() noexcept {
 }
 
 template <class T>
-T* Array<T>::Data() const noexcept {
+const T* Array<T>::Data() const noexcept {
+    return data_.get();
+}
+
+template <class T>
+T* Array<T>::Data() noexcept {
     return data_.get();
 }
 
@@ -278,7 +283,7 @@ void Array<T>::Reserve(
     }
     std::shared_ptr<T[]> newData(AllocateRaw<T>(size), RawMemoryDeleter<T>());
     for (std::size_t i = 0; i < size_; ++i) {
-        new (&newData[i]) T(std::move(data_[i]));
+        new (std::addressof(newData[i])) T(std::move(data_[i]));
         data_[i].~T();
     }
     capacity_ = size;
