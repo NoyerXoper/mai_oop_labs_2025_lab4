@@ -243,12 +243,12 @@ void Array<T>::Clear() noexcept {
 
 template <class T>
 const T* Array<T>::Data() const noexcept {
-    return data_.get();
+    return data_;
 }
 
 template <class T>
 T* Array<T>::Data() noexcept {
-    return data_.get();
+    return data_;
 }
 
 template <class T>
