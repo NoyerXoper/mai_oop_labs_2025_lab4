@@ -1,36 +1,16 @@
 #pragma once
 
 #include <initializer_list>
-#include <memory>
 #include <type_traits>
 
 namespace array {
-
-namespace {
-template <class T>
-struct RawMemoryDeleter {
-    void operator()(T* ptr) const;
-};
-}  // namespace
-
-// This is bad. Really bad.
-// It's all because of ban of raw ptr.
-// Array (vector) must be on eiter unique_ptr<T[], Deleter> or raw ptr.
-// Shared ptr is bad for vector because: it uses more memory and some other things that we would talk in few next lines.
-// About Data(): it is either UB or it makes vector slow.
-// Return types that Data() can have: std::shared_ptr<T[]>, std::weak_ptr<T[]>,
-// T* weak_ptr<T[]> ~ shared_ptr<T[]> because we can instantly call lock().
-// shared_ptr<T[]> is bad because the user might think that if he got
-// shared_ptr, then objects won't be destroyed. It can be achieved, but it would
-// significantly reduce performace of the vector or require more heap
-// allocations: it would require storing size in it's deleter size can't be
-// reference in neither vector nor deleter because it can easily become dangling
-// if it's reference in deleter or if it's reference in array, then we can call
-// reset() on Data() and mess things up. So, we can make it shared_ptr. But it
-// would require one more allocation and I don't like it. So, there is T* left.
-// It still can be invalidated, but the user knows about it. So, if we stored
-// data in T*, it would be much easier, more perfomant, more lightweight, more
-// blazing.
+// Rewrote this to raw pointer because I didn't understand the problem with my
+// previous solution: I had a custom deleter that deleted the memory for my and
+// array called the destructors of constructed objects So, there was only one
+// place for UB: Data(), but it's the same thing with the std::vector, so I'm
+// not sure about what was the "UB" And by the way, shared_ptr has only one
+// template parameter, Deleter it stores using type erasure, only unique_ptr
+// gets it from template parameter
 template <class T>
 class Array {
 public:
@@ -98,7 +78,7 @@ private:
     void Swap(Array& other) noexcept;
     std::size_t capacity_;
     std::size_t size_;
-    std::shared_ptr<T[]> data_;
+    T* data_;
 };
 }  // namespace array
 

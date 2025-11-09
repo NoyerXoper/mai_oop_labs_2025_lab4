@@ -16,7 +16,7 @@ inline T* AllocateRaw(std::size_t count) {
 }
 
 template <class T>
-void RawMemoryDeleter<T>::operator()(T* ptr) const {
+inline void DeallocateRawMemory(T* ptr) noexcept {
     ::operator delete[](ptr, std::align_val_t(alignof(T)));
 }
 }  // namespace
@@ -25,41 +25,28 @@ template <class T>
 Array<T>::Array()
     : capacity_(0)
     , size_(0)
-    , data_() {}
+    , data_(nullptr) {}
 
 template <class T>
 Array<T>::Array(std::size_t size) requires std::is_default_constructible_v<T>
-    : capacity_(size),
-      size_(size),
-      data_(std::shared_ptr<T[]>(AllocateRaw<T>(capacity_),
-                                 RawMemoryDeleter<T>())) {
-    for (std::size_t i = 0; i < capacity_; ++i) {
-        new (std::addressof(data_[i])) T();
-    }
-}
+    : capacity_(size), size_(size), data_(new T[capacity_]()) {}
 
 template <class T>
 Array<T>::Array(std::size_t size,
                 const T& obj) requires std::is_copy_constructible_v<T>
-    : capacity_(size),
-      size_(size),
-      data_(std::shared_ptr<T[]>(AllocateRaw<T>(capacity_),
-                                 RawMemoryDeleter<T>())) {
-    for (std::size_t i = 0; i < size_; ++i) {
-        new (std::addressof(data_[i])) T(obj);
+    : capacity_(size), size_(size), data_(AllocateRaw<T>(capacity_)) {
+    for (std::size_t i = 0; i < capacity_; ++i) {
+        new (data_ + i) T(obj);
     }
 }
 
 template <class T>
 Array<T>::Array(
     const std::initializer_list<T>& il) requires std::is_copy_constructible_v<T>
-    : capacity_(il.size()),
-      size_(il.size()),
-      data_(std::shared_ptr<T[]>(AllocateRaw<T>(capacity_),
-                                 RawMemoryDeleter<T>())) {
+    : capacity_(il.size()), size_(il.size()), data_(AllocateRaw<T>(capacity_)) {
     std::size_t i = 0;
     for (const T& obj : il) {
-        new (std::addressof(data_[i])) T(obj);
+        new (data_ + i) T(obj);
         ++i;
     }
 }
@@ -68,10 +55,9 @@ template <class T>
 Array<T>::Array(const Array<T>& other)
     : capacity_(other.capacity_)
     , size_(other.size_)
-    , data_(std::shared_ptr<T[]>(AllocateRaw<T>(capacity_),
-                                 RawMemoryDeleter<T>())) {
+    , data_(AllocateRaw<T>(capacity_)) {
     for (std::size_t i = 0; i < size_; ++i) {
-        new (std::addressof(data_[i])) T(other[i]);
+        new (data_ + i) T(other[i]);
     }
 }
 
@@ -79,7 +65,8 @@ template <class T>
 Array<T>::Array(Array&& other) noexcept
     : capacity_(other.capacity_)
     , size_(other.size_)
-    , data_(std::move(other.data_)) {
+    , data_(other.data_) {
+    other.data_ = nullptr;
     other.size_ = 0;
     other.capacity_ = 0;
 }
@@ -87,6 +74,7 @@ Array<T>::Array(Array&& other) noexcept
 template <class T>
 Array<T>::~Array() noexcept {
     Clear();
+    DeallocateRawMemory<T>(data_);
 }
 
 template <class T>
@@ -129,7 +117,7 @@ template <class T>
 template <class... Args>
 void Array<T>::EmplaceBack(Args&&... args) {
     CheckCapacity(size_ + 1);
-    new (std::addressof(data_[size_])) T(std::forward<Args>(args)...);
+    new (data_ + size_) T(std::forward<Args>(args)...);
     ++size_;
 }
 
@@ -149,25 +137,28 @@ template <class T>
 void Array<T>::Insert(std::size_t pos,
                       const T& obj) requires std::is_copy_assignable_v<T> &&
     std::is_move_constructible_v<T> && std::is_move_assignable_v<T> {
+    assert(pos < size_);
     CheckCapacity(size_ + 1);
     // Move the last object
-    new (std::addressof(data_[size_])) T(std::move(Back()));
+    new (data_ + size_) T(std::move(Back()));
     // Moving others
-    for (std::size_t i = size_; i >= pos + 2; --i) {
-        data_[i - 1] = std::move(data_[i - 2]);
+    for (std::size_t i = size_ - 1; i >= pos + 1; --i) {
+        data_[i] = std::move(data_[i - 1]);
     }
     data_[pos] = obj;
+    ++size_;
 }
 
 template <class T>
 void Array<T>::Insert(std::size_t pos, T&& obj) requires
     std::is_move_constructible_v<T> && std::is_move_assignable_v<T> {
+    assert(pos < size_);
     CheckCapacity(size_ + 1);
     // Move the last object
-    new (std::addressof(data_[size_])) T(std::move(Back()));
+    new (data_ + size_) T(std::move(Back()));
     // Moving others
-    for (std::size_t i = size_; i >= pos + 2; --i) {
-        data_[i - 1] = std::move(data_[i - 2]);
+    for (std::size_t i = size_ - 1; i >= pos + 1; --i) {
+        data_[i] = std::move(data_[i - 1]);
     }
     data_[pos] = std::move(obj);
     ++size_;
@@ -281,9 +272,11 @@ void Array<T>::Reserve(
     if (size <= capacity_) {
         return;
     }
-    std::shared_ptr<T[]> newData(AllocateRaw<T>(size), RawMemoryDeleter<T>());
+    T* newData = AllocateRaw<T>(size);
     for (std::size_t i = 0; i < size_; ++i) {
-        new (std::addressof(newData[i])) T(std::move(data_[i]));
+        new (newData + i) T(std::move_if_noexcept(data_[i]));
+    }
+    for (std::size_t i = 0; i < size_; ++i) {
         data_[i].~T();
     }
     capacity_ = size;
